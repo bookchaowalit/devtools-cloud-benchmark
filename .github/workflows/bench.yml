@@ -1,0 +1,185 @@
+name: bench
+# Manual only. Every run creates paid resources for a few minutes and deletes them;
+# a schedule is a separate owner decision (cost gate in the SDLC docs).
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: Comma-separated targets
+        default: railway,render,fly,cloudrun
+      idle_seconds:
+        description: Idle time before the first-request-after-idle probe (0 = skip, max 1800)
+        default: "0"
+permissions:
+  contents: read
+concurrency:
+  group: bench
+  cancel-in-progress: false
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+  # Inputs reach shell only through these variables, never by ${{ }} inside run scripts.
+  BENCH_TARGETS: ${{ inputs.targets }}
+  BENCH_IDLE_SECONDS: ${{ inputs.idle_seconds }}
+  BENCH_RUN_ID: ${{ github.run_id }}
+  BENCH_COMMIT: ${{ github.sha }}
+jobs:
+  bench:
+    runs-on: ubuntu-24.04
+    # Measurement is bounded (oha -t and subprocess timeouts, idle <= 1800 s, deploy <= 20 min
+    # per target); the cleanup job below still runs if this job times out or is cancelled.
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write # push the image to GHCR
+      id-token: write # Google workload identity federation
+    # Provider credentials only in the two jobs that call providers, not in publish.
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_SERVICE: ${{ vars.RAILWAY_SERVICE }}
+      RAILWAY_URL: ${{ vars.RAILWAY_URL }}
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      RENDER_OWNER_ID: ${{ vars.RENDER_OWNER_ID }}
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_ORG: ${{ vars.FLY_ORG }}
+      GCP_PROJECT: ${{ vars.GCP_PROJECT }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push once
+        id: build
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+      - name: Image digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: echo "BENCH_IMAGE=${IMAGE}@${DIGEST}" >> "$GITHUB_ENV"
+      - name: The image must be pullable without credentials (Render and Fly pull it anonymously)
+        run: |
+          repo="${IMAGE#ghcr.io/}"
+          token=$(curl -fsS "https://ghcr.io/token?scope=repository:${repo}:pull" | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])') || token=""
+          if ! curl -fsS -o /dev/null -H "Authorization: Bearer ${token}" \
+              -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.v2+json" \
+              "https://ghcr.io/v2/${repo}/manifests/${BENCH_IMAGE#*@}"; then
+            echo "::error::GHCR package ${IMAGE} is not public. Make it public once (package settings), then rerun."
+            exit 1
+          fi
+
+      - name: Google auth
+        if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
+      - name: Copy the same digest to Artifact Registry (Cloud Run pulls from there)
+        if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
+        run: |
+          ar="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/cloud-benchmark/app"
+          gcloud auth configure-docker asia-southeast1-docker.pkg.dev --quiet
+          docker buildx imagetools create --tag "${ar}:${GITHUB_SHA}" "$BENCH_IMAGE"
+          # A copy keeps the digest, so Cloud Run runs exactly what the others run.
+          echo "BENCH_IMAGE_GCP=${ar}@${BENCH_IMAGE#*@}" >> "$GITHUB_ENV"
+
+      - uses: superfly/flyctl-actions/setup-flyctl@fc53c09e1bc3be6f54706524e3b82c4f462f77be # 1.5
+        if: vars.FLY_ORG != ''
+        with:
+          version: 0.4.118
+      - name: Railway CLI
+        if: vars.RAILWAY_SERVICE != ''
+        run: npm install --global @railway/cli@5.70.0
+
+      - name: Deploy, measure, destroy
+        env:
+          BENCH_CLIENT_LOCATION: github-hosted ubuntu-24.04 (region not controlled)
+        run: python3 runner/orchestrate.py --targets "$BENCH_TARGETS" --idle-seconds "$BENCH_IDLE_SECONDS"
+      - name: Keep the records even if publishing fails
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bench-results-${{ github.run_id }}
+          path: results/
+          if-no-files-found: ignore
+
+  cleanup:
+    # A separate job, so it runs even when the bench job hit its timeout or was cancelled.
+    needs: bench
+    if: always()
+    runs-on: ubuntu-24.04
+    # 4 targets x 5 min destroy budget (DESTROY_TIMEOUT_S) + tool setup.
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    # Provider credentials only in the two jobs that call providers, not in publish.
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_SERVICE: ${{ vars.RAILWAY_SERVICE }}
+      RAILWAY_URL: ${{ vars.RAILWAY_URL }}
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      RENDER_OWNER_ID: ${{ vars.RENDER_OWNER_ID }}
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_ORG: ${{ vars.FLY_ORG }}
+      GCP_PROJECT: ${{ vars.GCP_PROJECT }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Google auth
+        if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
+      - uses: superfly/flyctl-actions/setup-flyctl@fc53c09e1bc3be6f54706524e3b82c4f462f77be # 1.5
+        if: vars.FLY_ORG != ''
+        with:
+          version: 0.4.118
+      - name: Railway CLI
+        if: vars.RAILWAY_SERVICE != ''
+        run: npm install --global @railway/cli@5.70.0
+      - name: Destroy every target of this run
+        run: python3 runner/orchestrate.py --destroy-only --targets "$BENCH_TARGETS"
+
+  publish:
+    needs: [bench, cleanup]
+    if: always() && needs.bench.result != 'skipped'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: bench-results-${{ github.run_id }}
+          path: ${{ runner.temp }}/results
+        continue-on-error: true
+      - name: Commit results (resync and regenerate on every attempt)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Run records live in results/<run>/ with unique names; site/data.json is derived,
+          # so each attempt starts from the branch tip, copies the records in, and rebuilds it.
+          for attempt in 1 2 3; do
+            git fetch origin "${GITHUB_REF_NAME}"
+            git reset -q --hard "origin/${GITHUB_REF_NAME}"
+            mkdir -p results
+            cp -R "${RUNNER_TEMP}/results/." results/ 2>/dev/null || true
+            python3 runner/build_site.py
+            git add results site/data.json
+            if git diff --cached --quiet; then exit 0; fi
+            git commit -q -m "results: bench run ${BENCH_RUN_ID}"
+            git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep $((attempt * 5))
+          done
+          echo "::error::could not push results; they are kept in the bench-results-${BENCH_RUN_ID} artifact"
+          exit 1

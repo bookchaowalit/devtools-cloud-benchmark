@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cloud Benchmark Lab</title>
+<meta name="description" content="One service, several PaaS targets, measured the same way, then torn down.">
+<style>
+  :root { --bg:#fafaf9; --fg:#1c1917; --muted:#57534e; --line:#e7e5e4; --accent:#0b3d91; --bad:#b91c1c; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0c0a09; --fg:#f5f5f4; --muted:#a8a29e; --line:#292524; --accent:#93b4ff; --bad:#f87171; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.55 system-ui, sans-serif; }
+  main { max-width:1040px; margin:0 auto; padding:32px 16px 64px; }
+  h1 { font-size:1.9rem; margin:0 0 4px; }
+  h2 { font-size:1.2rem; margin:40px 0 8px; }
+  p, li { color:var(--muted); }
+  .scroll { overflow-x:auto; border:1px solid var(--line); border-radius:8px; }
+  table { border-collapse:collapse; width:100%; min-width:760px; font-variant-numeric:tabular-nums; }
+  th, td { padding:8px 10px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+  th:first-child, td:first-child, td.l { text-align:left; }
+  th { font-size:.8rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  a { color:var(--accent); }
+  .empty { padding:20px; color:var(--muted); }
+  code { font-size:.9em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Cloud Benchmark Lab</h1>
+  <p>The same container (same commit, same image digest where the provider accepts an image) is
+  deployed to each target in Singapore, held to one instance, checked by a contract, measured from
+  one client, and deleted. Every number links back to its run record.</p>
+
+  <h2>Latest run per target</h2>
+  <div class="scroll"><table>
+    <thead><tr>
+      <th>Target</th><th>Size</th><th>Deploy s</th><th>Ready s</th>
+      <th>Seq p50 ms</th><th>Seq p95 ms</th><th>Load rps</th><th>Load p95 ms</th>
+      <th>CPU rps</th><th>Errors</th><th>Run</th>
+    </tr></thead>
+    <tbody id="latest"><tr><td class="empty" colspan="11">Loading…</td></tr></tbody>
+  </table></div>
+
+  <h2>What these results cannot tell you</h2>
+  <ul>
+    <li>The client is a GitHub-hosted runner whose location is not controlled, so latency includes
+      that network path. Compare targets within one run, not across runs.</li>
+    <li>Sizes are the closest each provider offers, not identical. The size column is exact.</li>
+    <li>One instance is not how you would run production; it isolates the platform, not the autoscaler.</li>
+    <li>Railway builds the Dockerfile itself, so its image digest differs from the others.</li>
+    <li>Prices change; cost per run is recorded in each target's ADR with the date it was checked.</li>
+  </ul>
+  <p>Source, ADRs and raw records: <a href="https://github.com/bookchaowalit/devtools-cloud-benchmark">github.com/bookchaowalit/devtools-cloud-benchmark</a></p>
+</main>
+<script>
+const fmt = (v, d = 0) => (v === null || v === undefined) ? "—" : Number(v).toFixed(d);
+const cell = (text, cls) => { const td = document.createElement("td"); td.textContent = text; if (cls) td.className = cls; return td; };
+fetch("data.json").then(r => r.json()).then(({ runs }) => {
+  const body = document.getElementById("latest");
+  body.replaceChildren();
+  const latest = new Map();
+  for (const run of runs) latest.set(run.target, run);
+  if (!latest.size) {
+    const tr = document.createElement("tr");
+    tr.append(cell("No published runs yet.", "empty"));
+    tr.firstChild.colSpan = 11;
+    body.append(tr);
+    return;
+  }
+  for (const run of latest.values()) {
+    const m = run.metrics, spec = run.target_spec || {};
+    const tr = document.createElement("tr");
+    tr.append(
+      cell(spec.provider || run.target, "l"), cell(spec.size || "—", "l"),
+      cell(fmt(m.deploy_s, 1)), cell(fmt(m.ready_s, 1)),
+      cell(fmt(m.latency_sequential?.p50_ms, 1)), cell(fmt(m.latency_sequential?.p95_ms, 1)),
+      cell(fmt(m.load_items?.rps_median)), cell(fmt(m.load_items?.p95_ms, 1)),
+      cell(fmt(m.load_cpu?.rps_median, 1)), cell(fmt((m.load_items?.error_rate ?? 0) * 100, 2) + "%"),
+    );
+    const link = document.createElement("a");
+    link.href = `https://github.com/bookchaowalit/devtools-cloud-benchmark/tree/main/results/${encodeURIComponent(run.id)}`;
+    link.textContent = run.started_at.slice(0, 10);
+    const td = cell(""); td.append(link); tr.append(td);
+    body.append(tr);
+  }
+}).catch(() => {
+  document.getElementById("latest").innerHTML = '<tr><td class="empty" colspan="11">Could not load data.json.</td></tr>';
+});
+</script>
+</body>
+</html>

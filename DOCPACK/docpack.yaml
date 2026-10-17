@@ -1,0 +1,8 @@
+system_id: bookchaowalit/public/book-apps/tools/devtools-cloud-benchmark
+prefix: CARD
+brand: "CLOUD BENCHMARK LAB"
+subtitle: "deploy บริการเดียวไปหลาย PaaS วัดผลแบบเดียวกัน แล้วลบทิ้ง"
+footer: "devtools-cloud-benchmark — Product Card"
+color: "#0b3d91"
+audience: internal
+tier: L0

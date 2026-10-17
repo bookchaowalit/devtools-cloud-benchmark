@@ -1,0 +1,10 @@
+# Point the lab service's "Config-as-code" path at targets/railway/railway.toml.
+# Region (Singapore) and replicas (1) are service settings, set once; see ADR-0003.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"

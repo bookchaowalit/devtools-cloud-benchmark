@@ -1,0 +1,10 @@
+# railway up uploads the build context and the config file only.
+*
+!Dockerfile
+!app/
+!app/**
+!targets/
+targets/*
+!targets/railway/
+targets/railway/*
+!targets/railway/railway.toml

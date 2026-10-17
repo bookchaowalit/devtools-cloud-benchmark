@@ -1,0 +1,4 @@
+# The Vercel project's root directory is site/; never upload anything else.
+/*
+!/site
+/site/.env*
