@@ -8,7 +8,7 @@ The point is not a leaderboard. It is evidence for one question per provider: *w
 platform actually good at, and what does it cost to find out?* Each target has an ADR that answers
 "why this one, not another".
 
-Results page: `site/` (Vercel project, to be connected). Raw records: `results/`.
+Results page: <https://cloud-benchmark-lab.vercel.app> (`site/`, Vercel project `cloud-benchmark-lab`, deploys on every push to `main`). Raw records: `results/`.
 
 ## Targets
 

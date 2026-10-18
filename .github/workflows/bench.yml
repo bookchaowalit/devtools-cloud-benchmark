@@ -63,6 +63,11 @@ jobs:
         run: echo "BENCH_IMAGE=${IMAGE}@${DIGEST}" >> "$GITHUB_ENV"
       - name: The image must be pullable without credentials (Render and Fly pull it anonymously)
         run: |
+          # Railway builds from source and Cloud Run pulls its own Artifact Registry copy.
+          if ! [[ ",${BENCH_TARGETS// /}," =~ ,(render|fly), ]]; then
+            echo "No target pulls from GHCR in this run; skipping the public-pull check."
+            exit 0
+          fi
           repo="${IMAGE#ghcr.io/}"
           token=$(curl -fsS "https://ghcr.io/token?scope=repository:${repo}:pull" | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])') || token=""
           if ! curl -fsS -o /dev/null -H "Authorization: Bearer ${token}" \

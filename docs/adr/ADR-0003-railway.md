@@ -61,16 +61,16 @@ From `runner/targets.py`, `targets/railway/`, `.railwayignore` and `bench.yml`.
 | Scale to zero | no | `runner/targets.py` |
 | Artifact | `source`: Railway builds the same `Dockerfile` at the same commit | `runner/targets.py` |
 | Requires | secret `RAILWAY_TOKEN`; variables `RAILWAY_SERVICE`, `RAILWAY_URL` | `runner/targets.py`, `bench.yml` |
-| Builder | `DOCKERFILE`, `dockerfilePath = "Dockerfile"` | `targets/railway/railway.toml` |
-| Health check | `/health`, timeout 300 s | `targets/railway/railway.toml` |
-| Restart policy | `ON_FAILURE` | `targets/railway/railway.toml` |
+| Builder | `DOCKERFILE`, `dockerfilePath = "Dockerfile"` | service settings (set 2026-10-18; Railway retired config-as-code `railway.toml`) |
+| Health check | `/health`, timeout 300 s | service settings (set 2026-10-18; Railway retired config-as-code `railway.toml`) |
+| Restart policy | `ON_FAILURE` | service settings (set 2026-10-18; Railway retired config-as-code `railway.toml`) |
 | Upload scope | only `Dockerfile` and `app/` | `.railwayignore` |
 | Env set at deploy | `BENCH_TARGET=railway`, `BENCH_REGION=asia-southeast1`, `BENCH_COMMIT=<sha>` via `railway variables --skip-deploys` | `targets/railway/deploy.sh` |
 | Deploy | `railway up --service "$RAILWAY_SERVICE" --ci`, then prints `$RAILWAY_URL` | `targets/railway/deploy.sh` |
 | Destroy | `targets/railway/railway_cleanup.py`: cancel in-flight and remove running deployments of the service, then verify none is live (exit 1 otherwise) | `targets/railway/destroy.sh` |
 | Cleanup env | `RAILWAY_TOKEN`, `RAILWAY_SERVICE` (the `cleanup` job does not need `RAILWAY_URL`) | `runner/targets.py` (`cleanup_requires`) |
 | CLI version | `@railway/cli@5.70.0` | `bench.yml` |
-| Region and replicas | service settings, set once in the dashboard (not in `railway.toml`) | runbook |
+| Region and replicas | `asia-southeast1-eqsg3a` × 1 replica, service settings | runbook |
 
 ## How the comparison is unfair to or favours Railway
 
@@ -83,15 +83,19 @@ From `runner/targets.py`, `targets/railway/`, `.railwayignore` and `bench.yml`.
 | Single replica with no overlap between deployments | Neutral for the bench | Zero-downtime deploys and multi-replica behaviour are not measured at all |
 | No scale-to-zero, so no cold-start probe applies | Neutral | `first_request_after_idle_ms` measures an always-on service |
 
-## Setup (one time; owner action, see the runbook in architecture-docs `11-deployment-go-live.md`)
+## Setup (one time; see the runbook in architecture-docs `11-deployment-go-live.md`)
 
-1. In a **lab** Railway workspace (not the production one), create the project `cloud-benchmark-lab` with an environment `bench`.
-2. Add an empty service (for example `bench`). **Do not connect a GitHub repository** to it.
-3. Settings → Config-as-code path = `targets/railway/railway.toml`. Region = Singapore. Replicas = 1. Leave resource limits unset (as recorded above).
-4. Networking → generate a public domain. Store the full URL **with scheme** (`https://…`) as the repository variable `RAILWAY_URL`. Store the service name or id as `RAILWAY_SERVICE`.
-5. Create a project token for the `bench` environment. Store it as the secret `RAILWAY_TOKEN`.
-6. Set a usage limit or alert on the lab workspace (exact feature to confirm in the dashboard) and record it in the cost table.
-7. Run the bench with `targets=railway` and fill the table below.
+Status on 2026-10-18 (done by Claude Code with the owner's approval, except step 5):
+
+| Step | State |
+|---|---|
+| 1. Project `cloud-benchmark-lab` (id `2137bf2b-cf3b-42ff-b23b-1ebff295eeb8`), environment `bench` (id `38ab9ea4-0397-40ad-8b82-5092ff34a712`) | done. **Deviation:** the account has one workspace, so the lab is a separate project in it, not a separate workspace. The project token in step 5 is scoped to this project's `bench` environment, which keeps the blast radius away from the production projects. |
+| 2. Empty service `bench-app` (id `48f9129a-d94a-4575-80ef-24298ee53a7c`), no GitHub source | done |
+| 3. Service settings: Dockerfile builder (`Dockerfile`), health check `/health` 300 s, restart `ON_FAILURE`, region `asia-southeast1-eqsg3a` × 1 replica, no resource limits | done. Railway has retired config-as-code (`railway.toml`), so these live on the service, not in the repository. |
+| 4. Domain `https://bench-app-bench.up.railway.app` (port 8080) → variable `RAILWAY_URL`; `RAILWAY_SERVICE=bench-app` | done |
+| 5. Project token for `bench` → secret `RAILWAY_TOKEN` | **owner action**: the CLI session is not authorised to create project tokens (`projectTokenCreate` → "Not Authorized"). Railway → project `cloud-benchmark-lab` → Settings → Tokens → create for `bench`, then `gh secret set RAILWAY_TOKEN -R bookchaowalit/devtools-cloud-benchmark` and paste it. |
+| 6. Usage limit or alert on the workspace | owner action; record it in the cost table |
+| 7. Run the bench with `targets=railway`, fill the table below | after step 5 |
 
 ## First real run (to fill)
 
