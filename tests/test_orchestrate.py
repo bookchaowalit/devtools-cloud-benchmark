@@ -30,7 +30,7 @@ FLY_ENV = {"FLY_API_TOKEN": "test", "FLY_ORG": "test", "BENCH_RUN_ID": "test"}
 
 
 class OrchestrateTest(unittest.TestCase):
-    def run_fly(self, server_target: str) -> tuple[int, Path]:
+    def run_fly(self, server_target: str) -> tuple[int, bool]:
         with (
             tempfile.TemporaryDirectory() as raw,
             Server("app.main:app", ROOT, {"BENCH_TARGET": server_target}) as srv,

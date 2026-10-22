@@ -9,7 +9,7 @@ dependencies = []
 # The service's own dependencies. The Dockerfile installs only this group
 # (exported to app/requirements.txt), so the runner and tests stay out of the image.
 app = ["fastapi", "uvicorn"]
-dev = ["pytest", "ruff", "httpx"]
+dev = ["pytest", "ruff", "httpx", "mypy", "pytest-cov"]
 
 [tool.uv]
 default-groups = ["app", "dev"]
@@ -32,3 +32,12 @@ ignore = ["S101"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["app", "contract", "runner", "targets", "tests"]
+check_untyped_defs = true
+warn_unused_ignores = true
+
+[tool.coverage.run]
+source = ["app", "contract", "runner", "targets"]

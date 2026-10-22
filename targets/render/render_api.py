@@ -15,12 +15,13 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from typing import Any
 
 API = "https://api.render.com/v1"
 REGION = "singapore"
 
 
-def call(method: str, path: str, body: dict | None = None) -> object:
+def call(method: str, path: str, body: dict | None = None) -> Any:
     req = urllib.request.Request(  # noqa: S310 - fixed https API host
         f"{API}{path}",
         method=method,
