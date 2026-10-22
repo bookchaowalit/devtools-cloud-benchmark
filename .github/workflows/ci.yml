@@ -9,13 +9,16 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  # Ruff + pytest: the contract tests start the real service and a deliberately wrong one.
+  # Ruff + mypy + pytest: the contract tests start the real service and a deliberately wrong one.
   python:
-    uses: bookchaowalit/platform-ci-workflows/.github/workflows/ci-python.yml@c37ef9d113eefb3ed45429717cb7ca201192c3fc # v1.0.1
+    uses: bookchaowalit/platform-ci-workflows/.github/workflows/ci-python.yml@87dc5e1c7e0416886a6371d5a101bb2ccba38edd # v1.1.1
     with:
       python-version: "3.12" # same as the image
+      # mypy runs from [tool.mypy]. Ratchet: measured 76.43% on 2026-10-22
+      # (ADR-0004: threshold = measured, rounded down).
+      coverage-threshold: "76"
   security:
-    uses: bookchaowalit/platform-ci-workflows/.github/workflows/security.yml@c37ef9d113eefb3ed45429717cb7ca201192c3fc # v1.0.1
+    uses: bookchaowalit/platform-ci-workflows/.github/workflows/security.yml@87dc5e1c7e0416886a6371d5a101bb2ccba38edd # v1.1.1
   image:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
