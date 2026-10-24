@@ -42,6 +42,8 @@ Results page: <https://cloud-benchmark-lab.vercel.app> (static `site/`, Vercel d
   would be skewed by an SDK; the runner is a CLI inside GitHub Actions, where a failure already
   fails the run (and a failed destroy is reported as `failed: destroy`).
 
+Sentry waiver: the only runtime is the measured service, which lives for minutes per bench run; an SDK would skew the measurements, and a runner failure already fails the GitHub Actions run.
+
 ## Disposition
 
 Lab / showcase (product card verdict `showcase`). Keep; the next step is an owner-approved first
