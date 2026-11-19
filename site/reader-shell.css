@@ -1,0 +1,228 @@
+/*
+ * Reader shell (2026-11-19): the shared calm, Apple-like look for content sites (blogs, notes, archives,
+ * course and path pages). A top bar, a page head, index pages of rows or cards with tags, dates, search and
+ * empty states, and an article page with a ~68ch measure, prose styles and previous/next links. Same palette
+ * as the App and Dashboard shells, with an --rs-* prefix so they can live in one app. Copy this file and
+ * components/reader-shell.tsx into the next content site; see READER.md.
+ *
+ * Text pairs pass 4.5:1 in both themes (checked with the WCAG formula, light / dark):
+ * --rs-fg on --rs-bg 16.8 / 19.3; --rs-muted on --rs-bg 5.1 / 8.2 and on --rs-surface 4.7 / 6.6;
+ * --rs-accent on --rs-bg 5.6 / 7.0 and on --rs-surface 5.1 / 5.6; --rs-tag-fg on --rs-tag-bg 6.5 / 8.3;
+ * --rs-on-button on --rs-button 4.7 / 4.7; --rs-code-fg on --rs-code-bg 15.5 / 15.6; a selected chip (--rs-bg on --rs-fg) 16.8 / 19.3.
+ * Control edges (search field, chips) use --rs-field-line: 3.6 / 5.1 on --rs-bg and 3.3 / 4.1 on --rs-surface (UI needs 3:1);
+ * the focus ring (--rs-focus) is 4.7 / 7.0 on --rs-bg. --rs-line is for
+ * dividers and card edges, which are decorative. Placeholders use --rs-muted (the browser default is ~3.2:1).
+ * Line height: 1.65 for Latin prose, 1.8 under :lang(th), because Thai stacks vowels and tone marks above and
+ * below the line. The measure is 68ch; Thai text sits in the same box.
+ */
+:root {
+  --rs-bg: #ffffff;
+  --rs-surface: #f5f5f7;
+  --rs-fg: #1d1d1f;
+  --rs-muted: #6e6e73;
+  --rs-line: #d2d2d7;
+  --rs-field-line: #86868b;
+  --rs-hover: rgb(0 0 0 / 5%);
+  --rs-accent: #0066cc;
+  --rs-button: #0071e3;
+  --rs-button-hover: #0062c4;
+  --rs-on-button: #ffffff;
+  --rs-focus: #0071e3;
+  --rs-tag-bg: #e8e8ed;
+  --rs-tag-fg: #515154;
+  --rs-code-bg: #f5f5f7;
+  --rs-code-fg: #1d1d1f;
+  --rs-quote: #0066cc;
+  --rs-leading: 1.65;
+  --rs-measure: 68ch;
+  --rs-font: var(--font-geist-sans, -apple-system), -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Thai", "Sukhumvit Set", Thonburi, sans-serif;
+  --rs-mono: var(--font-geist-mono, ui-monospace), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --rs-bg: #000000; --rs-surface: #1c1c1e; --rs-fg: #f5f5f7; --rs-muted: #a1a1a6; --rs-line: #38383a; --rs-field-line: #7c7c80;
+    --rs-hover: rgb(255 255 255 / 7%); --rs-accent: #2997ff; --rs-button: #0071e3; --rs-button-hover: #0062c4; --rs-focus: #2997ff;
+    --rs-tag-bg: #2c2c2e; --rs-tag-fg: #c7c7cc; --rs-code-bg: #1c1c1e; --rs-code-fg: #f5f5f7; --rs-quote: #2997ff;
+  }
+}
+:lang(th) { --rs-leading: 1.8; }
+/* Thai rules match the element's own language: lang="th" on Prose, a heading or an entry works inside an English page. */
+
+.rs { min-height: 100vh; display: flex; flex-direction: column; background: var(--rs-bg); color: var(--rs-fg); font-family: var(--rs-font); line-height: 1.5; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+.rs *, .rs *::before, .rs *::after { box-sizing: border-box; }
+:where(.rs) :where(button, input, select) { font: inherit; color: inherit; }
+:where(.rs) :focus-visible { outline: 3px solid var(--rs-focus); outline-offset: 2px; }
+:where(.rs) ::placeholder { color: var(--rs-muted); opacity: 1; }
+.rs-skip { position: absolute; left: 8px; top: -64px; z-index: 50; display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 2px solid var(--rs-focus); border-radius: 980px; background: var(--rs-bg); color: var(--rs-fg); text-decoration: none; }
+.rs-skip:focus { top: 8px; }
+.rs-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Top bar: brand on the left, a few plain links on the right. On phones it wraps (links stay visible) and stops being sticky. */
+.rs-top { position: sticky; top: 0; z-index: 30; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 12px; min-height: 52px; padding: 0 clamp(16px, 4vw, 32px); background: color-mix(in srgb, var(--rs-bg) 92%, transparent); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid var(--rs-line); }
+.rs-brand { display: inline-flex; align-items: baseline; gap: 10px; min-height: 44px; padding-top: 12px; color: var(--rs-fg); font-size: 17px; font-weight: 600; text-decoration: none; }
+.rs-brand small { color: var(--rs-muted); font-size: 13px; font-weight: 400; }
+.rs-nav ul { display: flex; flex-wrap: wrap; gap: 0 4px; margin: 0; padding: 0; list-style: none; }
+.rs-nav a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 980px; color: var(--rs-accent); font-size: 15px; text-decoration: none; }
+.rs-nav a:hover { background: var(--rs-hover); }
+.rs-nav a[aria-current="page"] { color: var(--rs-fg); font-weight: 600; }
+
+/* Page body */
+.rs-main { flex: 1; width: min(1120px, 100%); margin: 0 auto; padding: 40px clamp(16px, 4vw, 32px) 72px; }
+.rs-main > * + * { margin-top: 48px; }
+.rs-measure { max-width: var(--rs-measure); }
+.rs-head { max-width: var(--rs-measure); }
+.rs-eyebrow { margin: 0 0 8px; color: var(--rs-muted); font-size: 15px; font-weight: 600; }
+.rs-head h1, .rs-article-head h1 { margin: 0; font-size: clamp(32px, 5vw, 48px); font-weight: 700; letter-spacing: -.025em; line-height: 1.1; overflow-wrap: anywhere; text-wrap: balance; }
+.rs-lede { margin: 16px 0 0; color: var(--rs-muted); font-size: clamp(17px, 2.2vw, 21px); line-height: 1.5; text-wrap: pretty; }
+.rs-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+.rs-head h1:lang(th), .rs-article-head h1:lang(th) { line-height: 1.35; letter-spacing: 0; }
+.rs-lede:lang(th) { line-height: 1.7; }
+
+/* Sections on index pages */
+.rs-section-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; margin-bottom: 12px; }
+.rs-section-head h2 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -.015em; line-height: 1.25; }
+.rs-section-head a { display: inline-flex; align-items: center; min-height: 44px; color: var(--rs-accent); font-size: 15px; text-decoration: none; }
+.rs-section-head a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Buttons */
+.rs-button, .rs-plain { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 18px; border: 0; border-radius: 980px; font-size: 15px; font-weight: 600; text-decoration: none; cursor: pointer; }
+.rs-button { background: var(--rs-button); color: var(--rs-on-button); }
+.rs-button:hover { background: var(--rs-button-hover); }
+.rs-plain { padding: 0 14px; background: transparent; color: var(--rs-accent); font-weight: 400; }
+.rs-plain:hover { background: var(--rs-hover); }
+
+/* Toolbar: search + tag chips + result count */
+.rs-toolbar { display: grid; gap: 12px; }
+.rs-search { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+.rs-search label { display: grid; gap: 4px; flex: 1 1 240px; max-width: 420px; min-width: 0; }
+.rs-search-label { padding-left: 14px; color: var(--rs-muted); font-size: 13px; font-weight: 600; }
+.rs-search input { width: 100%; min-height: 44px; padding: 0 14px; border: 1px solid var(--rs-field-line); border-radius: 980px; background: var(--rs-bg); font-size: 16px; /* 16px stops iOS zooming on focus */ }
+.rs-search input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+.rs-search input:focus-visible { outline: 3px solid var(--rs-focus); outline-offset: 0; }
+.rs-chips ul { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+/* A chip never grows past its row, and a long label (say a ?tag= from the URL) wraps inside it. */
+.rs-chips li { max-width: 100%; }
+.rs-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 44px; padding: 6px 16px; overflow-wrap: anywhere; text-align: left; border: 1px solid var(--rs-field-line); border-radius: 980px; background: transparent; color: var(--rs-fg); font-size: 15px; text-decoration: none; cursor: pointer; }
+.rs-chip:hover { background: var(--rs-hover); }
+.rs-chip[aria-current="page"], .rs-chip[aria-pressed="true"] { border-color: var(--rs-fg); background: var(--rs-fg); color: var(--rs-bg); font-weight: 600; }
+.rs-chip small { color: inherit; font-size: 13px; font-variant-numeric: tabular-nums; opacity: .85; }
+.rs-count { margin: 0; color: var(--rs-muted); font-size: 15px; overflow-wrap: anywhere; }
+/* Results sit close to the toolbar that narrows them. */
+.rs-toolbar + .rs-list, .rs-toolbar + .rs-empty { margin-top: 24px; }
+
+/* Entries: rows (default) or cards. The title link covers the whole entry, so the entry is one large target. */
+.rs-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.rs-list > li + li { border-top: 1px solid var(--rs-line); }
+.rs-list[data-layout="cards"] { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 16px; }
+.rs-list[data-layout="cards"] > li + li { border-top: 0; }
+.rs-entry { position: relative; display: grid; gap: 6px; padding: 20px 0; border-radius: 12px; }
+.rs-list[data-layout="cards"] .rs-entry { height: 100%; align-content: start; padding: 20px; background: var(--rs-surface); border: 1px solid var(--rs-line); border-radius: 18px; }
+.rs-entry:has(.rs-entry-link:focus-visible) { outline: 3px solid var(--rs-focus); outline-offset: 4px; }
+.rs-entry:has(.rs-entry-link:focus-visible) .rs-entry-link { outline: none; }
+.rs-entry h2, .rs-entry h3 { order: 2; margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.01em; line-height: 1.3; overflow-wrap: anywhere; }
+.rs-entry-link { color: var(--rs-fg); text-decoration: none; }
+.rs-entry-link::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+.rs-entry:hover .rs-entry-link { color: var(--rs-accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.rs-entry-meta { order: 1; margin: 0; color: var(--rs-muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+.rs-entry-summary { order: 3; margin: 0; max-width: var(--rs-measure); color: var(--rs-muted); font-size: 16px; line-height: var(--rs-leading); overflow-wrap: anywhere; }
+.rs-entry .rs-tags { order: 4; margin-top: 4px; }
+.rs-entry h2:lang(th), .rs-entry h3:lang(th) { line-height: 1.5; }
+
+/* Tags: labels, not controls (filtering happens with .rs-chip) */
+.rs-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.rs-tag { display: inline-flex; align-items: center; min-height: 26px; padding: 0 10px; border-radius: 980px; background: var(--rs-tag-bg); color: var(--rs-tag-fg); font-size: 13px; font-weight: 500; }
+
+/* Empty state: says what happened and what to do next */
+.rs-empty { display: grid; justify-items: center; gap: 8px; padding: 40px 20px; border: 1px solid var(--rs-line); border-radius: 18px; background: var(--rs-surface); color: var(--rs-muted); font-size: 16px; line-height: 1.5; text-align: center; }
+.rs-empty h2, .rs-empty strong { margin: 0; color: var(--rs-fg); font-size: 19px; font-weight: 600; }
+.rs-empty p { margin: 0; max-width: 46ch; overflow-wrap: anywhere; }
+.rs-empty .rs-actions { margin-top: 8px; justify-content: center; }
+
+/* Article */
+.rs-article { max-width: var(--rs-measure); margin-inline: auto; }
+.rs-back { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin: -8px 0 16px -14px; padding: 0 14px; border-radius: 980px; color: var(--rs-accent); font-size: 15px; text-decoration: none; }
+.rs-back:hover { background: var(--rs-hover); }
+.rs-article-head { display: grid; gap: 14px; padding-bottom: 28px; margin-bottom: 32px; border-bottom: 1px solid var(--rs-line); }
+.rs-article-head .rs-lede { margin: 0; }
+.rs-meta { display: flex; flex-wrap: wrap; gap: 4px 0; margin: 0; padding: 0; list-style: none; color: var(--rs-muted); font-size: 15px; font-variant-numeric: tabular-nums; }
+.rs-meta li + li::before { content: "·"; padding: 0 8px; }
+
+/* Prose: the article body. Styles raw HTML from Markdown/MDX, so no classes are needed inside. */
+.rs-prose { max-width: var(--rs-measure); font-size: 18px; line-height: var(--rs-leading); overflow-wrap: break-word; }
+.rs-prose > :first-child { margin-top: 0; }
+.rs-prose :where(p, ul, ol, blockquote, pre, figure, table, .rs-code) { margin: 0 0 1.15em; }
+.rs-prose :where(h1, h2, h3, h4) { margin: 1.9em 0 .55em; font-weight: 700; letter-spacing: -.015em; line-height: 1.25; text-wrap: balance; scroll-margin-top: 72px; }
+.rs-prose :where(h1, h2) { font-size: 1.55em; }
+.rs-prose h3 { font-size: 1.25em; }
+.rs-prose h4 { font-size: 1.05em; }
+.rs-prose :where(h1, h2, h3, h4):lang(th) { line-height: 1.45; letter-spacing: 0; }
+.rs-prose a { color: var(--rs-accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.rs-prose a:hover { text-decoration-thickness: 2px; }
+.rs-prose :where(ul, ol) { padding-left: 1.4em; }
+.rs-prose ul { list-style: disc; }
+.rs-prose ol { list-style: decimal; }
+.rs-prose li { margin: .35em 0; padding-left: .2em; }
+.rs-prose li::marker { color: var(--rs-muted); }
+.rs-prose strong { font-weight: 650; }
+.rs-prose blockquote { padding: 2px 0 2px 1em; border-left: 3px solid var(--rs-quote); color: var(--rs-fg); font-style: normal; }
+.rs-prose blockquote > :last-child { margin-bottom: 0; }
+.rs-prose :not(pre) > code { padding: .12em .38em; border-radius: 6px; background: var(--rs-code-bg); color: var(--rs-code-fg); font-family: var(--rs-mono); font-size: .86em; overflow-wrap: anywhere; }
+.rs-prose pre { overflow-x: auto; padding: 16px 18px; border: 1px solid var(--rs-line); border-radius: 12px; background: var(--rs-code-bg); color: var(--rs-code-fg); font-family: var(--rs-mono); font-size: 15px; line-height: 1.6; tab-size: 2; }
+.rs-prose pre code { font: inherit; white-space: pre; }
+.rs-prose pre:focus-visible { outline-offset: 0; }
+.rs-code { position: relative; }
+.rs-code pre { margin: 0; padding-top: 52px; }
+.rs-copy { position: absolute; top: 4px; right: 4px; display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border: 0; border-radius: 980px; background: transparent; color: var(--rs-accent); font-family: var(--rs-font); font-size: 14px; cursor: pointer; }
+.rs-copy:hover { background: var(--rs-hover); }
+.rs-copy[data-state="failed"] { color: var(--rs-fg); font-weight: 600; }
+.rs-prose :where(img, video) { display: block; max-width: 100%; height: auto; border-radius: 12px; }
+.rs-prose figcaption { margin-top: 8px; color: var(--rs-muted); font-size: 15px; }
+.rs-prose hr { margin: 2.4em 0; border: 0; border-top: 1px solid var(--rs-line); }
+/* A wide table scrolls inside its .rs-table wrapper (TableScroll), never the page. The table itself keeps
+   display: table: block or flex display on table, tr or td drops the table semantics in Safari/VoiceOver. */
+.rs-table { max-width: 100%; overflow-x: auto; margin: 0 0 1.15em; }
+.rs-table > table { margin: 0; }
+.rs-prose table { border-collapse: collapse; font-size: 16px; font-variant-numeric: tabular-nums; }
+.rs-prose :where(th, td) { padding: 10px 14px 10px 0; border-bottom: 1px solid var(--rs-line); text-align: left; vertical-align: top; }
+.rs-prose th { font-weight: 600; white-space: nowrap; }
+
+/* Previous / next */
+.rs-pager { margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--rs-line); }
+.rs-pager ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.rs-pager li[data-dir="next"] { grid-column: 2; text-align: right; }
+.rs-pager a { display: grid; gap: 4px; min-height: 44px; height: 100%; padding: 14px 16px; border: 1px solid var(--rs-line); border-radius: 14px; color: var(--rs-fg); text-decoration: none; }
+.rs-pager a:hover { background: var(--rs-hover); }
+.rs-pager a span { color: var(--rs-muted); font-size: 14px; }
+.rs-pager a strong { color: var(--rs-accent); font-size: 16px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+
+/* Footer: always links back to the hub */
+.rs-foot { display: flex; flex-wrap: wrap; gap: 0 20px; width: min(1120px, 100%); margin: 0 auto; padding: 8px clamp(16px, 4vw, 32px) 32px; border-top: 1px solid var(--rs-line); font-size: 14px; }
+.rs-foot a { display: inline-flex; align-items: center; min-height: 44px; color: var(--rs-muted); text-decoration: none; }
+.rs-foot a:hover { color: var(--rs-fg); text-decoration: underline; text-underline-offset: 3px; }
+.rs-foot p { flex-basis: 100%; margin: 4px 0 0; color: var(--rs-muted); }
+
+@media (max-width: 640px) {
+  .rs-top { position: static; padding-bottom: 4px; }
+  .rs-brand small { display: none; }
+  /* The 16px gutter must hold the 3px ring and its 2px offset, so links pull left by at most 8px. */
+  .rs-nav { margin-left: -8px; }
+  .rs-back { margin-left: -8px; padding: 0 8px; }
+  .rs-main { padding-top: 28px; }
+  .rs-main > * + * { margin-top: 40px; }
+  .rs-search label { max-width: none; }
+  .rs-prose { font-size: 17px; }
+  .rs-prose pre { font-size: 14px; }
+  .rs-pager ul { grid-template-columns: minmax(0, 1fr); }
+  .rs-pager li[data-dir="next"] { grid-column: 1; }
+}
+@media (forced-colors: active) {
+  .rs-tag, .rs-chip, .rs-empty, .rs-pager a, .rs-prose pre, .rs-prose :not(pre) > code, .rs-list[data-layout="cards"] .rs-entry { border: 1px solid CanvasText; }
+  .rs-chip[aria-current="page"], .rs-chip[aria-pressed="true"] { forced-color-adjust: none; border-color: Highlight; background: Highlight; color: HighlightText; }
+  .rs-entry:has(.rs-entry-link:focus-visible) { outline-color: Highlight; }
+  .rs-button { border: 1px solid ButtonText; }
+}
+@media (prefers-reduced-motion: reduce) { .rs *, .rs *::before, .rs *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+
+/* The top bar is sticky: keep skip-link targets and keyboard-focused controls clear of it when the page scrolls to them. */
+html { scroll-padding-top: 64px; scroll-padding-bottom: 16px; }

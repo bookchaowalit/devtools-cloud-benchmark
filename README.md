@@ -78,3 +78,10 @@ the runbook in architecture-docs `operations/platform/cloud-benchmark-lab/`.
 ## License
 
 MIT
+
+## Results page look
+
+`site/` uses the shared **Reader shell** (`site/reader-shell.css` is a byte-identical copy from
+content-techblog-web; see `site/READER.md`) with Geist self-hosted under `site/fonts/` (OFL). One card per target on
+every screen width (no wide table), a legend for each metric, an empty state that says how runs start and links the
+planned targets' ADRs, and a footer back to bookchaowalit.com. `site/vercel.json` sends `/more-projects` to the hub.
