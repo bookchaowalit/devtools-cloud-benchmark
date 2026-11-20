@@ -1,3 +1,4 @@
 geist-latin.woff2 is Geist (Latin subset) by Vercel, from https://github.com/vercel/geist-font,
-licensed under the SIL Open Font License, Version 1.1 (https://openfontlicense.org/). Self-hosted so the
+licensed under the SIL Open Font License, Version 1.1. The copyright notice and the full licence text,
+copied unchanged from the Geist repository, are in OFL.txt next to this file. Self-hosted so the
 page makes no font request to a third party.

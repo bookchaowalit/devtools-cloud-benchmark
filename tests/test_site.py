@@ -21,6 +21,23 @@ class SiteTest(unittest.TestCase):
         self.assertTrue((SITE / "fonts" / "geist-latin.woff2").is_file())
         self.assertNotRegex(self.html, r"fonts\.googleapis|vercel-insights|speed-insights")
 
+    def test_font_ships_with_the_full_ofl_text(self):
+        ofl = (SITE / "fonts" / "OFL.txt").read_text()
+        self.assertIn("Copyright", ofl)
+        self.assertIn("The Geist Project Authors", ofl)
+        self.assertIn("SIL OPEN FONT LICENSE Version 1.1", ofl)
+        self.assertIn("PERMISSION & CONDITIONS", ofl)
+        self.assertIn("DISCLAIMER", ofl)
+        self.assertIn("OFL.txt", (SITE / "fonts" / "LICENSE.txt").read_text())
+
+    def test_metric_legend_matches_what_the_runner_measures(self):
+        legend = re.sub(r"\s+", " ", self.html)
+        self.assertIn("deploy script takes to return", legend)
+        self.assertIn("deploy script returning to the first <code>/health</code>", legend)
+        self.assertNotIn("under the same load", legend)
+        self.assertIn("separate test: 4 concurrent connections for 20 seconds", legend)
+        self.assertIn("20 concurrent connections, median of 3 runs of 30 seconds", legend)
+
     def test_links_back_to_the_hub_and_redirects_more_projects(self):
         self.assertIn('href="https://bookchaowalit.com/"', self.html)
         redirects = json.loads((SITE / "vercel.json").read_text())["redirects"]

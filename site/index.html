@@ -40,11 +40,11 @@
     <section aria-labelledby="metrics-title">
       <div class="rs-section-head"><h2 id="metrics-title">What each number means</h2></div>
       <dl class="cb-legend">
-        <div><dt>Deploy</dt><dd>Seconds from starting the deploy to the provider reporting it done.</dd></div>
-        <div><dt>Ready</dt><dd>Seconds from the deploy finishing to the first healthy <code>/health</code>.</dd></div>
+        <div><dt>Deploy</dt><dd>Seconds the target&rsquo;s deploy script takes to return (create, build or pull, start). Some providers return before the first deploy is live; that wait then counts as Ready.</dd></div>
+        <div><dt>Ready</dt><dd>Seconds from the deploy script returning to the first <code>/health</code> that answers 200.</dd></div>
         <div><dt>Sequential p50 / p95</dt><dd>Latency of one-at-a-time requests, in milliseconds (median and 95th percentile).</dd></div>
-        <div><dt>Load requests/s and p95</dt><dd>Throughput and 95th-percentile latency (ms) of the item endpoint under concurrent load.</dd></div>
-        <div><dt>CPU requests/s</dt><dd>Throughput of the CPU-bound endpoint under the same load.</dd></div>
+        <div><dt>Load requests/s and p95</dt><dd>Throughput and 95th-percentile latency (ms) of the item endpoint with 20 concurrent connections, median of 3 runs of 30 seconds.</dd></div>
+        <div><dt>CPU requests/s</dt><dd>Throughput of the CPU-bound endpoint in a separate test: 4 concurrent connections for 20 seconds.</dd></div>
         <div><dt>Errors</dt><dd>Share of failed requests during the item load test.</dd></div>
       </dl>
     </section>
